@@ -1,0 +1,53 @@
+#!/bin/sh
+
+# 50-rebindca
+# by throwaway96
+# Licensed under GNU AGPL version 3 or later.
+# https://github.com/throwaway96/webos1-bindca
+
+BIND_BASE=/var/lib/webosbrew/bindca
+
+if [ ! -d "${BIND_BASE}" ]; then
+	echo "[-] BIND_BASE ('${BIND_BASE}') must be a directory"
+	exit 1
+fi
+
+user_dev="$(findmnt -n -o MAJ:MIN -T "${BIND_BASE}")"
+
+rebind_dir() {
+	set -e
+	target="${1}"
+	bind_id="$(echo "${target}" | sed -e 's;/;__;g')"
+	bind_src="${BIND_BASE}/${bind_id}"
+
+	if [ -n "${user_dev}" ] && findmnt -n -o MAJ:MIN -- "${target}" | fgrep -x -e "${user_dev}"; then
+		echo "[-] Bind mount already exists over '${target}'"
+	elif [ -f "${target}" ]; then
+		if [ ! -f "${bind_src}" ]; then
+			echo "[-] '${bind_src}' is not a file as expected"
+			return 1
+		fi
+
+		mount --bind "${bind_src}" "${target}"
+		echo "[+] Bind mounted file '${bind_src}' over '${target}'"
+	elif [ -d "${target}" ]; then
+		if [ ! -d "${bind_src}" ]; then
+			echo "[-] '${bind_src}' is not a directory as expected"
+			return 1
+		fi
+		
+		mount --bind "${bind_src}" "${target}"
+		echo "[+] Bind mounted directory '${bind_src}' over '${target}'"
+	else
+		echo "[-] '${target}' is neither a file nor directory"
+		return 1
+	fi
+
+	return 0
+}
+
+rebind_dir /etc/ssl/certs
+rebind_dir /usr/share/ca-certificates
+rebind_dir /etc/ca-certificates.conf
+
+# vim: noet:ts=8:sw=8
